@@ -8,27 +8,42 @@ import {
   CircularProgress,
   TextField,
   Typography,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
+
+const models = [
+  { id: 1, name: "deepseek-r1", version: "8b" },
+  { id: 2, name: "deepseek-r1", version: "1.5b" },
+  { id: 3, name: "mistral", version: "7b" },
+];
 
 function App() {
   const [question, setQuestion] = useState("");
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(models[0]);
 
   const handleQuestionChange = (e) => {
     setQuestion(e.target.value);
   };
 
+  const handleModelChange = (e) => {
+    const model = models.find((m) => m.id === e.target.value);
+    setSelectedModel(model);
+  };
+
   const cleanResponse = (text) => {
-    // Elimina las etiquetas <think> y <think/>
     return text.replace(/<think.*?>/g, "").replace(/<\/think>/g, "");
   };
 
   const handleSubmit = async () => {
     setLoading(true);
-    setResponse(""); // Limpiar respuesta previa
+    setResponse("");
 
     try {
       const res = await fetch("http://127.0.0.1:11434/api/generate", {
@@ -37,7 +52,7 @@ function App() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "deepseek-r1:8b",
+          model: `${selectedModel.name}:${selectedModel.version}`,
           prompt: question,
         }),
       });
@@ -54,15 +69,14 @@ function App() {
         done = doneReading;
         accumulatedData += decoder.decode(value, { stream: true });
 
-        // Procesar los fragmentos conforme llegan
         const fragments = accumulatedData.split("\n");
-        accumulatedData = fragments.pop(); // Mantener el fragmento incompleto para la siguiente lectura
+        accumulatedData = fragments.pop();
 
         for (const fragment of fragments) {
           try {
             const parsed = JSON.parse(fragment);
-            const cleanedResponse = cleanResponse(parsed.response); // Limpiar la respuesta antes de agregarla
-            setResponse((prev) => prev + cleanedResponse); // Concatenar la respuesta limpia
+            const cleanedResponse = cleanResponse(parsed.response);
+            setResponse((prev) => prev + cleanedResponse);
           } catch (error) {
             console.error("Error al procesar fragmento JSON:", error);
           }
@@ -81,6 +95,17 @@ function App() {
       <Typography variant="h4" gutterBottom>
         Consulta a Ollama
       </Typography>
+
+      <FormControl fullWidth sx={{ marginBottom: 2 }}>
+        <InputLabel>Modelo</InputLabel>
+        <Select value={selectedModel.id} onChange={handleModelChange}>
+          {models.map((model) => (
+            <MenuItem key={model.id} value={model.id}>
+              {`${model.name} (${model.version})`}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
 
       <TextField
         label="Pregunta"
@@ -117,7 +142,7 @@ function App() {
         <Typography variant="h6">Respuesta:</Typography>
         <Box sx={{ whiteSpace: "pre-wrap" }}>
           {response ? (
-            <ReactMarkdown children={response} />
+            <ReactMarkdown>{response}</ReactMarkdown>
           ) : loading ? (
             "Esperando respuesta..."
           ) : (
